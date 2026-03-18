@@ -109,10 +109,18 @@ class Orchestrator:
         self.config = get_agent_config()
 
         # LLM for routing and response generation
-        # Model ID format: claude-{version}-{variant}
+        # Explicitly pass API key to ensure it works on deployed environments
+        anthropic_api_key = os.getenv("ANTHROPIC_API_KEY")
+        if not anthropic_api_key:
+            logger.error("ANTHROPIC_API_KEY not set in environment!")
+            raise ValueError("ANTHROPIC_API_KEY environment variable is required")
+
+        # Use standard Anthropic model ID format
+        # Note: Model availability varies by API key type (standard vs custom gateway)
         self.llm = ChatAnthropic(
-            model="claude-4-6-sonnet",  # Claude Sonnet 4.6
-            temperature=0
+            model="claude-sonnet-4-20250514",  # Claude Sonnet 4 (standard format)
+            temperature=0,
+            anthropic_api_key=anthropic_api_key  # Explicitly pass API key
         )
 
         # Build the workflow graph
