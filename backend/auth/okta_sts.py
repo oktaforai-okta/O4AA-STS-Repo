@@ -22,9 +22,11 @@ Token Exchange Parameters:
 """
 
 import logging
-from typing import Dict, Any, Optional
+from typing import Dict, Any, Optional, List
 from datetime import datetime
 import httpx
+import base64
+import json
 
 from .agent_config import get_agent_config, AgentConfig
 from .jwt_builder import JWTBuilderFactory
@@ -38,25 +40,86 @@ SUBJECT_TOKEN_TYPE_ID = "urn:ietf:params:oauth:token-type:id_token"
 CLIENT_ASSERTION_TYPE_JWT = "urn:ietf:params:oauth:client-assertion-type:jwt-bearer"
 
 
+def _decode_jwt_claims(token: str) -> Dict[str, Any]:
+    """
+    Decode JWT and extract claims without signature verification.
+    Used to extract scope information from access tokens.
+    """
+    try:
+        # Split the JWT into parts
+        parts = token.split('.')
+        if len(parts) != 3:
+            logger.warning("[JWT Decode] Invalid JWT format")
+            return {}
+
+        # Decode the payload (second part)
+        payload = parts[1]
+        # Add padding if needed
+        padding = 4 - len(payload) % 4
+        if padding != 4:
+            payload += '=' * padding
+
+        decoded = base64.urlsafe_b64decode(payload)
+        claims = json.loads(decoded)
+        return claims
+    except Exception as e:
+        logger.error(f"[JWT Decode] Failed to decode token: {e}")
+        return {}
+
+
+def _extract_scopes(token: str) -> List[str]:
+    """Extract scopes from JWT access token."""
+    claims = _decode_jwt_claims(token)
+
+    # Try common scope claim names
+    scopes = []
+    if 'scp' in claims:
+        # Okta uses 'scp' for scopes (can be string or array)
+        scp = claims['scp']
+        if isinstance(scp, list):
+            scopes = scp
+        elif isinstance(scp, str):
+            scopes = scp.split(' ')
+    elif 'scope' in claims:
+        # Some providers use 'scope'
+        scope = claims['scope']
+        if isinstance(scope, list):
+            scopes = scope
+        elif isinstance(scope, str):
+            scopes = scope.split(' ')
+
+    return [s for s in scopes if s]  # Filter empty strings
+
+
 class OktaSTSExchange:
     """
-    Handles OAuth-STS token exchange for GitHub access.
+    Handles OAuth-STS token exchange for service access (GitHub, Jira, etc.).
 
-    Exchanges user ID tokens for GitHub access tokens via Okta Brokered Consent.
+    Exchanges user ID tokens for service access tokens via Okta Brokered Consent.
     Handles the interaction_required flow for first-time consent.
     """
 
-    def __init__(self):
-        """Initialize the STS exchange handler."""
+    def __init__(self, resource_indicator: Optional[str] = None, scopes: Optional[List[str]] = None):
+        """
+        Initialize the STS exchange handler.
+
+        Args:
+            resource_indicator: Optional resource indicator. If not provided,
+                               uses the default GitHub resource indicator from config.
+            scopes: Optional list of scopes to request (required for Jira)
+        """
         self._config = get_agent_config()
         self._jwt_builder = JWTBuilderFactory.get_builder()
+        # Allow override of resource indicator for different services (GitHub, Jira, etc.)
+        self._resource_indicator = resource_indicator or self._config.resource_indicator
+        self._scopes = scopes or []
 
     def is_configured(self) -> bool:
         """Check if STS exchange is properly configured."""
         return bool(
             self._config.agent_id and
             self._config.private_key and
-            self._config.resource_indicator and
+            self._resource_indicator and
             self._jwt_builder
         )
 
@@ -67,15 +130,22 @@ class OktaSTSExchange:
             audience=self._config.token_endpoint
         )
 
-        return {
+        payload = {
             "grant_type": GRANT_TYPE_TOKEN_EXCHANGE,
             "requested_token_type": REQUESTED_TOKEN_TYPE_STS,
             "subject_token": user_id_token,
             "subject_token_type": SUBJECT_TOKEN_TYPE_ID,
             "client_assertion_type": CLIENT_ASSERTION_TYPE_JWT,
             "client_assertion": client_assertion,
-            "resource": self._config.resource_indicator,
+            "resource": self._resource_indicator,
         }
+
+        # Add scope parameter if scopes are specified (required for Jira)
+        if self._scopes:
+            payload["scope"] = " ".join(self._scopes)
+            logger.info(f"[OAuth-STS] Requesting scopes: {payload['scope']}")
+
+        return payload
 
     async def exchange_token(
         self,
@@ -108,7 +178,7 @@ class OktaSTSExchange:
             # Build token exchange payload
             payload = self._build_token_exchange_payload(user_id_token)
 
-            logger.info(f"[OAuth-STS] Exchanging token for resource: {self._config.resource_indicator}")
+            logger.info(f"[OAuth-STS] Exchanging token for resource: {self._resource_indicator}")
             logger.info(f"[OAuth-STS] Token endpoint: {self._config.token_endpoint}")
             logger.info(f"[OAuth-STS] Grant type: {payload['grant_type']}")
             logger.info(f"[OAuth-STS] Requested token type: {payload['requested_token_type']}")
@@ -127,21 +197,28 @@ class OktaSTSExchange:
             # Success - got the access token
             if response.status_code == 200:
                 token_data = response.json()
+                access_token = token_data.get("access_token")
+
+                # Extract scopes from the JWT access token
+                scopes = _extract_scopes(access_token) if access_token else []
+
                 logger.info(f"[OAuth-STS] Token exchange SUCCESS, expires_in={token_data.get('expires_in')}")
+                logger.info(f"[OAuth-STS] Extracted scopes: {scopes}")
 
                 return {
                     "success": True,
-                    "access_token": token_data.get("access_token"),
+                    "access_token": access_token,
                     "token_type": token_data.get("token_type", "Bearer"),
                     "expires_in": token_data.get("expires_in"),
                     "refresh_token": token_data.get("refresh_token"),
+                    "scopes": scopes,  # Real scopes from JWT
                     "interaction_required": False,
                     "interaction_uri": None,
                     "demo_mode": False,
                     "exchange_details": {
                         "flow": "OAuth-STS (Brokered Consent)",
                         "agent": self._config.name,
-                        "resource": "GitHub",
+                        "resource": self._resource_indicator,
                         "status": "token_granted",
                         "exchanged_at": datetime.now().isoformat(),
                     }

@@ -20,16 +20,16 @@ body {
 }
 
 ::-webkit-scrollbar-track {
-  background: #1a1a2e;
+  background: #2d1f3d;
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #6366f1;
+  background: #5a3468;
   border-radius: 4px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #818cf8;
+  background: #7c4a8a;
 }
 
 /* Chat message styling */
@@ -91,4 +91,39 @@ body {
 
 .typing-dot:nth-child(3) {
   animation-delay: 0.4s;
+}
+
+/* Fade in animation for collapsible sections */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-fadeIn {
+  animation: fadeIn 0.3s ease-out;
+}
+
+/* Glow effect on hover */
+.glow-on-hover:hover {
+  box-shadow: 0 0 20px rgba(99, 102, 241, 0.4);
+}
+
+/* Pulse glow effect */
+@keyframes pulseGlow {
+  0%, 100% {
+    box-shadow: 0 0 10px rgba(99, 102, 241, 0.3);
+  }
+  50% {
+    box-shadow: 0 0 20px rgba(99, 102, 241, 0.6);
+  }
+}
+
+.animate-pulse-glow {
+  animation: pulseGlow 2s ease-in-out infinite;
 }

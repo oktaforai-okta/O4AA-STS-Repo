@@ -8,12 +8,44 @@ interface Props {
 }
 
 export default function AgentFlowCard({ steps, isLoading }: Props) {
-  // Define workflow stages
+  // Detect if this is Jira or GitHub based on steps
+  const isJira = steps.some(s => s.step === 'execute_jira');
+  const executeStep = isJira ? 'execute_jira' : 'execute_github';
+
+  // Define workflow stages with progressive colors (using inline styles for reliability)
   const workflowStages = [
-    { id: 'router', label: 'Router', icon: 'RT' },
-    { id: 'sts_exchange', label: 'OAuth-STS', icon: 'STS' },
-    { id: 'execute_github', label: 'GitHub', icon: 'GH' },
-    { id: 'generate_response', label: 'Response', icon: '✓' },
+    {
+      id: 'router',
+      label: 'Router',
+      icon: 'RT',
+      bgColor: '#60a5fa',           // Light Blue
+      inactiveBg: 'rgba(96, 165, 250, 0.2)',
+      textColor: '#2563eb'
+    },
+    {
+      id: 'sts_exchange',
+      label: 'OAuth-STS',
+      icon: 'STS',
+      bgColor: '#fbbf24',           // Yellow
+      inactiveBg: 'rgba(251, 191, 36, 0.2)',
+      textColor: '#d97706'
+    },
+    {
+      id: executeStep,
+      label: isJira ? 'Jira' : 'GitHub',
+      icon: isJira ? 'JR' : 'GH',
+      bgColor: isJira ? '#2196f3' : '#4ade80',
+      inactiveBg: isJira ? 'rgba(33, 150, 243, 0.2)' : 'rgba(74, 222, 128, 0.2)',
+      textColor: isJira ? '#1565c0' : '#16a34a'
+    },
+    {
+      id: 'generate_response',
+      label: 'Response',
+      icon: '✓',
+      bgColor: '#16a34a',           // Dark Green
+      inactiveBg: 'rgba(22, 163, 74, 0.2)',
+      textColor: '#15803d'
+    },
   ];
 
   const getStepStatus = (stageId: string) => {
@@ -22,7 +54,7 @@ export default function AgentFlowCard({ steps, isLoading }: Props) {
   };
 
   return (
-    <div className="bg-white rounded-xl border-2 border-neutral-border shadow-sm overflow-hidden">
+    <div className="rounded-xl border-2 shadow-sm overflow-hidden" style={{ backgroundColor: '#e0f2f1', borderColor: '#26a69a' }}>
       <div className="bg-gradient-to-r from-primary to-primary-light px-4 py-3 border-b border-neutral-border">
         <h3 className="text-white font-semibold flex items-center gap-2">
           <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -48,14 +80,13 @@ export default function AgentFlowCard({ steps, isLoading }: Props) {
                 <div className="flex flex-col items-center">
                   <div
                     className={`w-10 h-10 rounded-lg flex items-center justify-center text-xs font-bold transition-all ${
-                      isCompleted
-                        ? 'bg-success-green text-white'
-                        : isError
-                        ? 'bg-error-red text-white'
-                        : isActive
-                        ? 'bg-accent text-white animate-pulse'
-                        : 'bg-gray-200 text-gray-400'
+                      isActive ? 'animate-pulse' : ''
                     }`}
+                    style={{
+                      backgroundColor: isCompleted || isActive ? stage.bgColor : isError ? '#ef4444' : stage.inactiveBg,
+                      color: isCompleted || isActive || isError ? '#ffffff' : stage.textColor,
+                      boxShadow: isCompleted ? '0 4px 6px -1px rgba(0,0,0,0.1)' : isActive ? '0 10px 15px -3px rgba(0,0,0,0.1)' : '0 1px 2px rgba(0,0,0,0.05)'
+                    }}
                   >
                     {isCompleted ? (
                       <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -73,7 +104,12 @@ export default function AgentFlowCard({ steps, isLoading }: Props) {
                       stage.icon
                     )}
                   </div>
-                  <span className="text-[10px] text-gray-500 mt-1">{stage.label}</span>
+                  <span
+                    className="text-[10px] mt-1 font-medium"
+                    style={{ color: isCompleted || isActive ? stage.textColor : '#6b7280' }}
+                  >
+                    {stage.label}
+                  </span>
                 </div>
 
                 {/* Arrow between stages */}

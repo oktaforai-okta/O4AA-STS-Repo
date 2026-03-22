@@ -4,6 +4,7 @@ import { useState, useRef, useEffect } from 'react';
 import { useSession, signOut } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import ReactMarkdown from 'react-markdown';
 import AgentFlowCard from '@/components/AgentFlowCard';
 import TokenExchangeCard from '@/components/TokenExchangeCard';
 import UserIdentityCard from '@/components/UserIdentityCard';
@@ -11,13 +12,22 @@ import QuickActionsCard from '@/components/QuickActionsCard';
 import TokenFlowAnalysis from '@/components/TokenFlowAnalysis';
 import { ChatMessage, AgentFlowStep, TokenExchange } from '@/types';
 
-const exampleQuestions = [
+const githubExampleQuestions = [
   { text: "Show all repositories in my organization", icon: "📁", category: "Repositories" },
   { text: "List open pull requests that need review", icon: "🔀", category: "Pull Requests" },
   { text: "Show high-priority issues across projects", icon: "🐛", category: "Issues" },
   { text: "Comment on PR #123 saying 'LGTM, approved!'", icon: "💬", category: "Actions" },
   { text: "Show recent repository activity and commits", icon: "📊", category: "Activity" },
   { text: "What can you help me with?", icon: "❓", category: "Help" },
+];
+
+const jiraExampleQuestions = [
+  { text: "List all my Jira projects", icon: "📋", category: "Projects" },
+  { text: "Show open issues assigned to me", icon: "🎫", category: "My Issues" },
+  { text: "Create a bug in PROJECT: Login not working", icon: "➕", category: "Create" },
+  { text: "Find issues with JQL: priority = High", icon: "🔍", category: "Search" },
+  { text: "Move PROJ-123 to In Progress", icon: "▶️", category: "Transition" },
+  { text: "Add comment to PROJ-456: Working on this", icon: "💬", category: "Comment" },
 ];
 
 const CHAT_STORAGE_KEY = 'devops-chat-messages';
@@ -36,7 +46,12 @@ export default function Home() {
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [interactionUri, setInteractionUri] = useState<string | null>(null);
   const [pendingMessage, setPendingMessage] = useState<string | null>(null);
+  const [activeService, setActiveService] = useState<'github' | 'jira'>('github');
+  const [showSuggestions, setShowSuggestions] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  // Get example questions based on active service
+  const exampleQuestions = activeService === 'github' ? githubExampleQuestions : jiraExampleQuestions;
 
   const isLoadingAuth = status === 'loading';
 
@@ -124,7 +139,7 @@ export default function Home() {
 
     const authWindow = window.open(
       interactionUri,
-      'GitHubAuthorization',
+      activeService === 'jira' ? 'JiraAuthorization' : 'GitHubAuthorization',
       `width=${width},height=${height},left=${left},top=${top}`
     );
 
@@ -284,25 +299,43 @@ export default function Home() {
       {/* Authorization Modal (when interaction_required) */}
       {interactionUri && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50">
-          <div className="bg-white rounded-2xl shadow-2xl p-8 max-w-md w-full border-4 border-accent">
+          <div className={`bg-white rounded-2xl shadow-2xl p-8 max-w-md w-full border-4 ${
+            activeService === 'jira' ? 'border-blue-500' : 'border-gray-800'
+          }`}>
             <div className="text-center">
-              <div className="mx-auto w-16 h-16 bg-gradient-to-br from-accent to-devops-purple rounded-full flex items-center justify-center mb-4">
-                <svg className="w-10 h-10 text-white" fill="currentColor" viewBox="0 0 24 24">
-                  <path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/>
-                </svg>
+              <div className={`mx-auto w-16 h-16 rounded-full flex items-center justify-center mb-4 ${
+                activeService === 'jira'
+                  ? 'bg-gradient-to-br from-blue-500 to-blue-700'
+                  : 'bg-gradient-to-br from-gray-700 to-gray-900'
+              }`}>
+                {activeService === 'jira' ? (
+                  <svg className="w-10 h-10 text-white" fill="currentColor" viewBox="0 0 24 24">
+                    <path d="M11.571 11.513H0a5.218 5.218 0 0 0 5.232 5.215h2.13v2.057A5.215 5.215 0 0 0 12.575 24V12.518a1.005 1.005 0 0 0-1.005-1.005zm5.723-5.756H5.736a5.215 5.215 0 0 0 5.215 5.214h2.129v2.058a5.218 5.218 0 0 0 5.215 5.214V6.758a1.001 1.001 0 0 0-1.001-1.001zM23.013 0H11.455a5.215 5.215 0 0 0 5.215 5.215h2.129v2.057A5.215 5.215 0 0 0 24 12.483V1.005A1.005 1.005 0 0 0 23.013 0z"/>
+                  </svg>
+                ) : (
+                  <svg className="w-10 h-10 text-white" fill="currentColor" viewBox="0 0 24 24">
+                    <path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/>
+                  </svg>
+                )}
               </div>
-              <h3 className="text-2xl font-bold text-gray-800 mb-2">GitHub Authorization Required</h3>
+              <h3 className="text-2xl font-bold text-gray-800 mb-2">
+                {activeService === 'jira' ? 'Atlassian Jira Authorization Required' : 'GitHub Authorization Required'}
+              </h3>
               <p className="text-gray-600 mb-6">
-                The DevOps Agent needs your permission to access your GitHub account via Okta Brokered Consent.
+                The DevOps Agent needs your permission to access your {activeService === 'jira' ? 'Atlassian Jira' : 'GitHub'} account via Okta Brokered Consent.
               </p>
               <button
                 onClick={handleAuthorize}
-                className="w-full py-4 px-8 bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600 text-white rounded-xl font-bold text-lg transition-all shadow-xl hover:shadow-2xl flex items-center justify-center space-x-3 border-b-4 border-red-700 hover:scale-105 transform animate-pulse"
+                className={`w-full py-4 px-8 text-white rounded-xl font-bold text-lg transition-all shadow-xl hover:shadow-2xl flex items-center justify-center space-x-3 hover:scale-105 transform animate-pulse ${
+                  activeService === 'jira'
+                    ? 'bg-gradient-to-r from-blue-500 to-blue-700 hover:from-blue-600 hover:to-blue-800 border-b-4 border-blue-800'
+                    : 'bg-gradient-to-r from-gray-700 to-gray-900 hover:from-gray-600 hover:to-gray-800 border-b-4 border-gray-950'
+                }`}
               >
                 <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
                 </svg>
-                <span>🔓 Authorize GitHub Access</span>
+                <span>🔓 Authorize {activeService === 'jira' ? 'Atlassian Jira' : 'GitHub'} Access</span>
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
                 </svg>
@@ -318,7 +351,7 @@ export default function Home() {
               </button>
               <div className="mt-4 pt-4 border-t border-gray-200">
                 <p className="text-xs text-gray-500">
-                  This is a secure, one-time authorization through Okta. After authorizing, you can use all GitHub features.
+                  This is a secure, one-time authorization through Okta. After authorizing, you can use all {activeService === 'jira' ? 'Jira' : 'GitHub'} features.
                 </p>
               </div>
             </div>
@@ -343,6 +376,7 @@ export default function Home() {
         </div>
 
         <div className="px-6 py-4 flex justify-between items-center relative z-10">
+          {/* Left: Logo */}
           <div className="flex items-center space-x-4">
             <div className="relative">
               {/* DevOps Agent Robot Icon */}
@@ -361,12 +395,57 @@ export default function Home() {
               </div>
             </div>
             <div>
-              <h1 className="text-white text-2xl font-bold">DevOps Agent</h1>
-              <p className="text-gray-300 text-sm">Okta Brokered Consent + GitHub</p>
+              <h1 className="text-white text-2xl font-bold">AI DevOps Agent</h1>
+              <p className="text-gray-300 text-sm">Okta Brokered Consent</p>
             </div>
           </div>
 
+          {/* Center: Service Toggle */}
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setActiveService('github')}
+              className={`px-4 py-2 rounded-lg font-semibold text-sm transition-all flex items-center gap-2 ${
+                activeService === 'github'
+                  ? 'bg-gray-800 text-white shadow-lg'
+                  : 'bg-white/10 text-gray-400 hover:bg-white/20'
+              }`}
+            >
+              <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
+                <path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/>
+              </svg>
+              GitHub
+            </button>
+            <button
+              onClick={() => setActiveService('jira')}
+              className={`px-4 py-2 rounded-lg font-semibold text-sm transition-all flex items-center gap-2 ${
+                activeService === 'jira'
+                  ? 'bg-blue-600 text-white shadow-lg'
+                  : 'bg-white/10 text-gray-400 hover:bg-white/20'
+              }`}
+            >
+              <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
+                <path d="M11.571 11.513H0a5.218 5.218 0 0 0 5.232 5.215h2.13v2.057A5.215 5.215 0 0 0 12.575 24V12.518a1.005 1.005 0 0 0-1.005-1.005zm5.723-5.756H5.736a5.215 5.215 0 0 0 5.215 5.214h2.129v2.058a5.218 5.218 0 0 0 5.215 5.214V6.758a1.001 1.001 0 0 0-1.001-1.001zM23.013 0H11.455a5.215 5.215 0 0 0 5.215 5.215h2.129v2.057A5.215 5.215 0 0 0 24 12.483V1.005A1.005 1.005 0 0 0 23.013 0z"/>
+              </svg>
+              Jira
+            </button>
+          </div>
+
+          {/* Right: Suggestions + User */}
           <div className="flex items-center space-x-3">
+            <button
+              onClick={() => setShowSuggestions(!showSuggestions)}
+              className={`px-4 py-2 rounded-lg font-semibold text-sm transition-all flex items-center gap-2 ${
+                showSuggestions
+                  ? 'bg-yellow-500 text-black shadow-lg'
+                  : 'bg-white/10 text-gray-300 hover:bg-white/20'
+              }`}
+            >
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
+              </svg>
+              Suggestions
+            </button>
+            <div className="w-px h-8 bg-gray-600"></div>
             <span className="text-gray-200 text-sm">{session?.user?.email}</span>
             <button
               onClick={handleSignOut}
@@ -381,6 +460,44 @@ export default function Home() {
         </div>
       </header>
 
+      {/* Suggestions Panel - Collapsible (Top of page) */}
+      {showSuggestions && (
+        <div className="border-b-2 border-gray-600 px-4 py-3" style={{ background: 'linear-gradient(90deg, #1a1a2e 0%, #2d1f3d 50%, #1a1a2e 100%)' }}>
+          <div className="max-w-6xl mx-auto">
+            <div className="flex items-center justify-between mb-3">
+              <span className="text-sm font-semibold text-gray-300">
+                {activeService === 'jira' ? '🔵 Jira Suggestions' : '⬛ GitHub Suggestions'}
+              </span>
+              <button
+                onClick={() => setShowSuggestions(false)}
+                className="text-gray-400 hover:text-white text-sm"
+              >
+                ✕ Close
+              </button>
+            </div>
+            <div className="grid grid-cols-6 gap-2">
+              {exampleQuestions.map((question, idx) => (
+                <button
+                  key={idx}
+                  onClick={() => {
+                    handleSendMessage(question.text);
+                    setShowSuggestions(false);
+                  }}
+                  className={`p-3 rounded-lg text-center text-xs transition-all hover:scale-[1.02] ${
+                    activeService === 'jira'
+                      ? 'bg-blue-900/50 hover:bg-blue-800/50 text-blue-100 border border-blue-700'
+                      : 'bg-gray-800/50 hover:bg-gray-700/50 text-gray-100 border border-gray-600'
+                  }`}
+                >
+                  <div className="text-2xl mb-1">{question.icon}</div>
+                  <div className="font-medium">{question.category}</div>
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Dual Pane Layout */}
       <div className="flex-1 flex overflow-hidden">
         {/* Left Pane - Chat Interface */}
@@ -388,41 +505,114 @@ export default function Home() {
           {/* Messages Area */}
           <div className="flex-1 overflow-y-auto p-6 space-y-4">
             {chatMessages.length === 0 && (
-              <div className="text-center py-8 max-w-2xl mx-auto">
+              <div className="text-center py-8 max-w-3xl mx-auto">
+                {/* Service Icon - Changes based on active service */}
                 <div className="inline-block mb-4 relative">
-                  <div className="absolute inset-0 bg-accent/20 rounded-full blur-2xl animate-pulse"></div>
-                  {/* DevOps Agent Robot Icon */}
-                  <div className="w-16 h-16 bg-gradient-to-br from-accent to-devops-purple rounded-2xl flex items-center justify-center shadow-xl relative z-10">
-                    <svg className="w-10 h-10 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-                      <circle cx="8" cy="9" r="1.5" fill="currentColor" />
-                      <circle cx="16" cy="9" r="1.5" fill="currentColor" />
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12h6" />
-                    </svg>
+                  <div className={`absolute inset-0 rounded-full blur-2xl animate-pulse ${
+                    activeService === 'jira' ? 'bg-blue-500/30' : 'bg-gray-700/30'
+                  }`}></div>
+                  <div className={`w-20 h-20 rounded-2xl flex items-center justify-center shadow-xl relative z-10 ${
+                    activeService === 'jira'
+                      ? 'bg-gradient-to-br from-blue-500 to-blue-700'
+                      : 'bg-gradient-to-br from-gray-700 to-gray-900'
+                  }`}>
+                    {activeService === 'jira' ? (
+                      // Jira Icon
+                      <svg className="w-12 h-12 text-white" fill="currentColor" viewBox="0 0 24 24">
+                        <path d="M11.571 11.513H0a5.218 5.218 0 0 0 5.232 5.215h2.13v2.057A5.215 5.215 0 0 0 12.575 24V12.518a1.005 1.005 0 0 0-1.005-1.005zm5.723-5.756H5.736a5.215 5.215 0 0 0 5.215 5.214h2.129v2.058a5.218 5.218 0 0 0 5.215 5.214V6.758a1.001 1.001 0 0 0-1.001-1.001zM23.013 0H11.455a5.215 5.215 0 0 0 5.215 5.215h2.129v2.057A5.215 5.215 0 0 0 24 12.483V1.005A1.005 1.005 0 0 0 23.013 0z"/>
+                      </svg>
+                    ) : (
+                      // GitHub Icon
+                      <svg className="w-12 h-12 text-white" fill="currentColor" viewBox="0 0 24 24">
+                        <path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/>
+                      </svg>
+                    )}
                   </div>
                 </div>
+
                 <h2 className="text-2xl font-bold text-white mb-2">Welcome, {session?.user?.name || 'Developer'}!</h2>
-                <p className="text-gray-300 mb-6">
-                  Your AI-powered DevOps assistant with Okta Brokered Consent. Ask about your GitHub repos, PRs, or issues.
+                <p className="text-gray-300 mb-4">
+                  {activeService === 'jira'
+                    ? 'Manage your Jira projects and issues with AI assistance'
+                    : 'Manage your GitHub repositories with AI assistance'}
                 </p>
 
-                {/* Example Questions */}
+                {/* Service Toggle - Larger and more prominent */}
+                <div className="flex justify-center gap-3 mb-6">
+                  <button
+                    onClick={() => setActiveService('github')}
+                    className={`px-8 py-4 rounded-xl font-bold text-base transition-all flex items-center gap-3 border-2 ${
+                      activeService === 'github'
+                        ? 'bg-gray-900 text-white shadow-lg scale-105 border-gray-600'
+                        : 'bg-white/5 text-gray-400 hover:bg-white/10 border-transparent hover:border-gray-600'
+                    }`}
+                  >
+                    <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 24 24">
+                      <path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/>
+                    </svg>
+                    GitHub
+                  </button>
+                  <button
+                    onClick={() => setActiveService('jira')}
+                    className={`px-8 py-4 rounded-xl font-bold text-base transition-all flex items-center gap-3 border-2 ${
+                      activeService === 'jira'
+                        ? 'bg-blue-600 text-white shadow-lg scale-105 border-blue-400'
+                        : 'bg-white/5 text-gray-400 hover:bg-white/10 border-transparent hover:border-blue-400'
+                    }`}
+                  >
+                    <svg className="w-6 h-6" fill="currentColor" viewBox="0 0 24 24">
+                      <path d="M11.571 11.513H0a5.218 5.218 0 0 0 5.232 5.215h2.13v2.057A5.215 5.215 0 0 0 12.575 24V12.518a1.005 1.005 0 0 0-1.005-1.005zm5.723-5.756H5.736a5.215 5.215 0 0 0 5.215 5.214h2.129v2.058a5.218 5.218 0 0 0 5.215 5.214V6.758a1.001 1.001 0 0 0-1.001-1.001zM23.013 0H11.455a5.215 5.215 0 0 0 5.215 5.215h2.129v2.057A5.215 5.215 0 0 0 24 12.483V1.005A1.005 1.005 0 0 0 23.013 0z"/>
+                    </svg>
+                    Jira
+                  </button>
+                </div>
+
+                {/* Service-specific description */}
+                <div className={`inline-flex items-center gap-2 px-4 py-2 rounded-full text-sm mb-6 ${
+                  activeService === 'jira'
+                    ? 'bg-blue-500/20 text-blue-300'
+                    : 'bg-gray-700/50 text-gray-300'
+                }`}>
+                  {activeService === 'jira' ? (
+                    <>
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                      </svg>
+                      Projects, Issues, Sprints, JQL Search
+                    </>
+                  ) : (
+                    <>
+                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4" />
+                      </svg>
+                      Repos, Pull Requests, Issues, Code
+                    </>
+                  )}
+                </div>
+
+                {/* Example Questions - Service-specific colors */}
                 <div className="grid grid-cols-2 gap-3 text-left">
                   {exampleQuestions.map((question, idx) => (
                     <button
                       key={idx}
                       onClick={() => handleSendMessage(question.text)}
-                      className="group p-4 backdrop-blur-sm border-2 hover:shadow-xl rounded-xl transition-all text-left flex items-start space-x-3 hover:scale-[1.02] transform"
-                      style={{ backgroundColor: '#fff7ed', borderColor: '#fed7aa' }}
+                      className={`group p-4 backdrop-blur-sm border-2 hover:shadow-xl rounded-xl transition-all text-left flex items-start space-x-3 hover:scale-[1.02] transform ${
+                        activeService === 'jira'
+                          ? 'bg-blue-50 border-blue-200 hover:border-blue-400'
+                          : 'bg-gray-50 border-gray-200 hover:border-gray-400'
+                      }`}
                     >
                       <div
-                        className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 transition-all shadow-sm group-hover:shadow-md"
-                        style={{ backgroundColor: '#ffedd5' }}
+                        className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 transition-all shadow-sm group-hover:shadow-md ${
+                          activeService === 'jira' ? 'bg-blue-100' : 'bg-gray-100'
+                        }`}
                       >
                         <span className="text-lg group-hover:scale-110 transition-transform">{question.icon}</span>
                       </div>
                       <div className="flex-1">
-                        <div className="text-xs font-semibold uppercase tracking-wide mb-1" style={{ color: '#ea580c' }}>{question.category}</div>
+                        <div className={`text-xs font-semibold uppercase tracking-wide mb-1 ${
+                          activeService === 'jira' ? 'text-blue-600' : 'text-gray-600'
+                        }`}>{question.category}</div>
                         <span className="text-sm text-gray-700 group-hover:text-gray-900 font-medium leading-relaxed block">
                           {question.text}
                         </span>
@@ -438,7 +628,7 @@ export default function Home() {
                 key={msg.id}
                 className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
               >
-                <div className={`flex items-start space-x-3 max-w-2xl ${msg.role === 'user' ? 'flex-row-reverse space-x-reverse' : ''}`}>
+                <div className={`flex items-start space-x-3 max-w-4xl ${msg.role === 'user' ? 'flex-row-reverse space-x-reverse' : ''}`}>
                   <div className={`flex-shrink-0 w-10 h-10 rounded-lg flex items-center justify-center shadow-lg ${
                     msg.role === 'user'
                       ? 'bg-gradient-to-br from-devops-purple to-accent'
@@ -464,9 +654,13 @@ export default function Home() {
                       ? 'bg-gradient-to-br from-accent to-devops-purple text-white border-b-4 border-devops-purple/50'
                       : 'bg-white border-2 border-neutral-border'
                   }`}>
-                    <p className={`whitespace-pre-wrap ${msg.role === 'assistant' ? 'text-gray-700' : ''}`}>
-                      {msg.content}
-                    </p>
+                    {msg.role === 'assistant' ? (
+                      <div className="prose prose-sm max-w-none text-gray-700 prose-headings:text-gray-800 prose-strong:text-gray-800 prose-code:bg-gray-100 prose-code:px-1 prose-code:rounded prose-pre:bg-gray-100 prose-pre:text-gray-800 prose-ul:my-2 prose-li:my-0 prose-table:text-sm">
+                        <ReactMarkdown>{msg.content}</ReactMarkdown>
+                      </div>
+                    ) : (
+                      <p className="whitespace-pre-wrap">{msg.content}</p>
+                    )}
 
                     {/* Show authorization button if interaction is required */}
                     {msg.role === 'assistant' && msg.interactionRequired && msg.interactionUri && (
@@ -475,12 +669,22 @@ export default function Home() {
                           setInteractionUri(msg.interactionUri!);
                           setPendingMessage(chatMessages.find(m => m.role === 'user' && m.timestamp < msg.timestamp)?.content || '');
                         }}
-                        className="mt-3 w-full py-2 px-4 bg-gradient-to-r from-github-dark to-github-green hover:from-github-green hover:to-github-dark text-white rounded-lg font-semibold transition shadow-md hover:shadow-lg flex items-center justify-center space-x-2"
+                        className={`mt-3 w-full py-2 px-4 text-white rounded-lg font-semibold transition shadow-md hover:shadow-lg flex items-center justify-center space-x-2 ${
+                          activeService === 'jira'
+                            ? 'bg-gradient-to-r from-blue-600 to-blue-800 hover:from-blue-500 hover:to-blue-700'
+                            : 'bg-gradient-to-r from-gray-700 to-gray-900 hover:from-gray-600 hover:to-gray-800'
+                        }`}
                       >
-                        <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
-                          <path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/>
-                        </svg>
-                        <span>Authorize GitHub Access</span>
+                        {activeService === 'jira' ? (
+                          <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
+                            <path d="M11.571 11.513H0a5.218 5.218 0 0 0 5.232 5.215h2.13v2.057A5.215 5.215 0 0 0 12.575 24V12.518a1.005 1.005 0 0 0-1.005-1.005zm5.723-5.756H5.736a5.215 5.215 0 0 0 5.215 5.214h2.129v2.058a5.218 5.218 0 0 0 5.215 5.214V6.758a1.001 1.001 0 0 0-1.001-1.001zM23.013 0H11.455a5.215 5.215 0 0 0 5.215 5.215h2.129v2.057A5.215 5.215 0 0 0 24 12.483V1.005A1.005 1.005 0 0 0 23.013 0z"/>
+                          </svg>
+                        ) : (
+                          <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
+                            <path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/>
+                          </svg>
+                        )}
+                        <span>Authorize {activeService === 'jira' ? 'Atlassian Jira' : 'GitHub'} Access</span>
                       </button>
                     )}
 
@@ -523,23 +727,29 @@ export default function Home() {
 
           {/* Input Area */}
           <div className="border-t-4 px-6 py-4 shadow-2xl" style={{ background: 'linear-gradient(90deg, #2d1f3d 0%, #3d2847 50%, #2d1f3d 100%)', borderColor: '#fef08a' }}>
+            {/* Input Form */}
             <form onSubmit={(e) => { e.preventDefault(); handleSendMessage(); }} className="flex space-x-3 max-w-4xl mx-auto">
               <div className="flex-1 relative">
                 <input
                   type="text"
                   value={message}
                   onChange={(e) => setMessage(e.target.value)}
-                  placeholder="Ask about your GitHub repos, PRs, or issues..."
+                  placeholder={activeService === 'jira'
+                    ? "Ask about your Jira projects, issues, or create tickets..."
+                    : "Ask about your GitHub repos, PRs, or issues..."}
                   className="w-full px-5 py-3 border-2 border-neutral-border rounded-xl focus:outline-none focus:border-accent focus:ring-2 focus:ring-accent/20 transition bg-white text-gray-700 placeholder-gray-400"
                   disabled={isLoading}
                 />
                 <div className="absolute right-4 top-1/2 -translate-y-1/2 opacity-30">
-                  {/* DevOps Agent Robot Icon hint */}
-                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-                    <circle cx="8" cy="9" r="1" fill="currentColor" />
-                    <circle cx="16" cy="9" r="1" fill="currentColor" />
-                  </svg>
+                  {activeService === 'jira' ? (
+                    <svg className="w-5 h-5 text-blue-500" fill="currentColor" viewBox="0 0 24 24">
+                      <path d="M11.571 11.513H0a5.218 5.218 0 0 0 5.232 5.215h2.13v2.057A5.215 5.215 0 0 0 12.575 24V12.518a1.005 1.005 0 0 0-1.005-1.005zm5.723-5.756H5.736a5.215 5.215 0 0 0 5.215 5.214h2.129v2.058a5.218 5.218 0 0 0 5.215 5.214V6.758a1.001 1.001 0 0 0-1.001-1.001zM23.013 0H11.455a5.215 5.215 0 0 0 5.215 5.215h2.129v2.057A5.215 5.215 0 0 0 24 12.483V1.005A1.005 1.005 0 0 0 23.013 0z"/>
+                    </svg>
+                  ) : (
+                    <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+                      <path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/>
+                    </svg>
+                  )}
                 </div>
               </div>
               <button
@@ -572,10 +782,10 @@ export default function Home() {
           <TokenExchangeCard exchanges={currentTokenExchanges} />
 
           {/* Token Flow Analysis - Learn More Section */}
-          <TokenFlowAnalysis exchanges={currentTokenExchanges} isLoading={isLoading} />
+          <TokenFlowAnalysis exchanges={currentTokenExchanges} isLoading={isLoading} activeService={activeService} />
 
           {/* Quick Actions */}
-          <QuickActionsCard onAction={(msg) => handleSendMessage(msg)} onTestConsent={handleTestConsent} />
+          <QuickActionsCard onAction={(msg) => handleSendMessage(msg)} onTestConsent={handleTestConsent} activeService={activeService} />
 
           {/* Architecture Link */}
           <Link

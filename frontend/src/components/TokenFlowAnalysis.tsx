@@ -7,24 +7,34 @@ import { ChevronDown, ChevronRight, Key, Shield, Clock, CheckCircle, AlertCircle
 interface TokenFlowAnalysisProps {
   exchanges: TokenExchange[];
   isLoading?: boolean;
+  activeService?: 'github' | 'jira';
 }
 
-export default function TokenFlowAnalysis({ exchanges, isLoading }: TokenFlowAnalysisProps) {
+export default function TokenFlowAnalysis({ exchanges, isLoading, activeService = 'github' }: TokenFlowAnalysisProps) {
   const [isExpanded, setIsExpanded] = useState(true);
 
   // Get the latest exchange for display
   const latestExchange = exchanges.length > 0 ? exchanges[exchanges.length - 1] : null;
 
-  // Parse JWT claims from the exchange (mock for demo)
+  // Determine service name from latest exchange or prop
+  const serviceName = latestExchange?.agent_name.toLowerCase().includes('jira') ? 'Jira' :
+                     latestExchange?.agent_name.toLowerCase().includes('github') ? 'GitHub' :
+                     activeService === 'jira' ? 'Jira' : 'GitHub';
+
+  // Parse JWT claims from the exchange
   const getTokenClaims = () => {
     if (!latestExchange) return null;
 
-    // In a real scenario, you'd decode the JWT
-    // For demo, we show representative claims
+    const isJira = serviceName === 'Jira';
+    // Get real scopes from the token exchange
+    const actualScopes = latestExchange.scopes && latestExchange.scopes.length > 0
+      ? latestExchange.scopes.join(', ')
+      : null;
+
     return {
       sub: latestExchange.agent_name || 'user@example.com',
-      aud: 'github-api',
-      scope: latestExchange.scopes?.join(', ') || 'repo, read:org',
+      aud: isJira ? 'jira-api' : 'github-api',
+      scope: actualScopes,  // Only include if we have real scopes
       iat: new Date().toISOString(),
       exp: new Date(Date.now() + 3600000).toISOString(),
     };
@@ -107,7 +117,7 @@ export default function TokenFlowAnalysis({ exchanges, isLoading }: TokenFlowAna
                   )}
                 </div>
                 <span className="text-sm text-white/90">
-                  GitHub Access Token {latestExchange?.status === 'granted' ? '✓' : latestExchange?.status === 'interaction_required' ? '(Consent Required)' : ''}
+                  {serviceName} Access Token {latestExchange?.status === 'granted' ? '✓' : latestExchange?.status === 'interaction_required' ? '(Consent Required)' : ''}
                 </span>
               </div>
             </div>
@@ -129,10 +139,12 @@ export default function TokenFlowAnalysis({ exchanges, isLoading }: TokenFlowAna
                   <span className="text-cyan-300 w-12">aud:</span>
                   <span className="text-white/90">{claims.aud}</span>
                 </div>
-                <div className="flex">
-                  <span className="text-cyan-300 w-12">scope:</span>
-                  <span className="text-white/90 truncate">{claims.scope}</span>
-                </div>
+                {claims.scope && (
+                  <div className="flex">
+                    <span className="text-cyan-300 w-12">scope:</span>
+                    <span className="text-white/90 truncate">{claims.scope}</span>
+                  </div>
+                )}
                 <div className="flex">
                   <span className="text-cyan-300 w-12">exp:</span>
                   <span className="text-white/90 text-[10px]">{claims.exp}</span>
