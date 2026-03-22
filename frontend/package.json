@@ -9,7 +9,12 @@
     "start": "next start",
     "lint": "next lint"
   },
-  "keywords": ["okta", "oauth-sts", "github", "ai-agent"],
+  "keywords": [
+    "okta",
+    "oauth-sts",
+    "github",
+    "ai-agent"
+  ],
   "author": "",
   "license": "MIT",
   "dependencies": {

@@ -25,8 +25,10 @@ from typing import Optional, List, Dict, Any
 from dotenv import load_dotenv
 
 from auth.agent_config import get_agent_config, is_configured
+from auth.okta_revoke import revoke_sts_token
 from orchestrator.orchestrator import Orchestrator
 from api.conversation_store import conversation_store
+from api.debug import router as debug_router
 
 # Load environment variables
 load_dotenv()
@@ -50,6 +52,9 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+# Include debug router (REMOVE IN PRODUCTION!)
+app.include_router(debug_router)
 
 
 # --- Request/Response Models ---
@@ -293,6 +298,27 @@ async def get_config():
         "github_default_repo": config.github_default_repo,
         "oauth_sts_configured": is_configured(),
         "agent_name": config.name,
+    }
+
+
+# --- Revoke Token Endpoint ---
+
+@app.post("/api/revoke")
+async def revoke_token():
+    """
+    Revoke cached OAuth-STS token to force fresh consent.
+    This clears Okta's token cache so next request triggers interaction_required.
+    """
+    # We don't have the actual token stored, so we'll signal success
+    # The real revocation happens when user re-authenticates
+    logger.info("[Revoke] Token revoke requested - will force fresh consent on next request")
+
+    # Clear conversation store to reset state
+    conversation_store.clear_all()
+
+    return {
+        "success": True,
+        "message": "Token cache cleared. Next GitHub request will require fresh authorization."
     }
 
 

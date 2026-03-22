@@ -118,9 +118,10 @@ class Orchestrator:
         # Use standard Anthropic model ID format
         # Note: Model availability varies by API key type (standard vs custom gateway)
         self.llm = ChatAnthropic(
-            model="claude-sonnet-4-20250514",  # Claude Sonnet 4 (standard format)
+            model="claude-sonnet-4-6",
             temperature=0,
-            anthropic_api_key=anthropic_api_key  # Explicitly pass API key
+            anthropic_api_key=anthropic_api_key,
+            anthropic_api_url="https://api.anthropic.com"
         )
 
         # Build the workflow graph

@@ -15,11 +15,14 @@ const config: Config = {
         'primary-light': '#16213e',  // Dark shadow
         'accent': '#6366f1',         // Indigo (DevOps primary accent)
         'accent-light': '#818cf8',   // Light indigo
+        'accent-dark': '#4f46e5',    // Darker indigo
         'devops-purple': '#8b5cf6',  // GitHub/DevOps purple
         'devops-green': '#10b981',   // Success green
         'devops-blue': '#3b82f6',    // Blue
         'github-dark': '#24292e',    // GitHub dark
         'github-green': '#238636',   // GitHub green
+        'github-orange': '#f97316',  // GitHub actions orange
+        'code-green': '#10b981',     // Terminal green
         'tech-purple': '#8b5cf6',    // AI/technology purple
         'tech-purple-light': '#a78bfa',
         'okta-blue': '#007dc1',      // Okta brand blue
