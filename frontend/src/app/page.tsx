@@ -34,6 +34,7 @@ const CHAT_STORAGE_KEY = 'devops-chat-messages';
 const AGENT_FLOW_STORAGE_KEY = 'devops-agent-flow';
 const TOKEN_EXCHANGE_STORAGE_KEY = 'devops-token-exchanges';
 const SESSION_ID_STORAGE_KEY = 'devops-session-id';
+const ACTIVE_SERVICE_STORAGE_KEY = 'devops-active-service';
 
 export default function Home() {
   const { data: session, status } = useSession();
@@ -48,25 +49,60 @@ export default function Home() {
   const [pendingMessage, setPendingMessage] = useState<string | null>(null);
   const [activeService, setActiveService] = useState<'github' | 'jira'>('github');
   const [showSuggestions, setShowSuggestions] = useState(false);
+  const [rightPanelWidth, setRightPanelWidth] = useState(480); // Increased default width
+  const [isResizing, setIsResizing] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const resizeRef = useRef<HTMLDivElement>(null);
+
+  // Handle panel resize
+  useEffect(() => {
+    const handleMouseMove = (e: MouseEvent) => {
+      if (!isResizing) return;
+      const newWidth = window.innerWidth - e.clientX;
+      // Constrain between 350px and 700px
+      setRightPanelWidth(Math.min(700, Math.max(350, newWidth)));
+    };
+
+    const handleMouseUp = () => {
+      setIsResizing(false);
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+    };
+
+    if (isResizing) {
+      document.body.style.cursor = 'col-resize';
+      document.body.style.userSelect = 'none';
+      document.addEventListener('mousemove', handleMouseMove);
+      document.addEventListener('mouseup', handleMouseUp);
+    }
+
+    return () => {
+      document.removeEventListener('mousemove', handleMouseMove);
+      document.removeEventListener('mouseup', handleMouseUp);
+    };
+  }, [isResizing]);
 
   // Get example questions based on active service
   const exampleQuestions = activeService === 'github' ? githubExampleQuestions : jiraExampleQuestions;
 
   const isLoadingAuth = status === 'loading';
 
-  // Load chat history from sessionStorage on mount
+  // Load chat history and active service from sessionStorage on mount
   useEffect(() => {
     try {
       const savedMessages = sessionStorage.getItem(CHAT_STORAGE_KEY);
       const savedAgentFlow = sessionStorage.getItem(AGENT_FLOW_STORAGE_KEY);
       const savedTokenExchanges = sessionStorage.getItem(TOKEN_EXCHANGE_STORAGE_KEY);
       const savedSessionId = sessionStorage.getItem(SESSION_ID_STORAGE_KEY);
+      const savedActiveService = sessionStorage.getItem(ACTIVE_SERVICE_STORAGE_KEY);
 
       if (savedMessages) setChatMessages(JSON.parse(savedMessages));
       if (savedAgentFlow) setCurrentAgentFlow(JSON.parse(savedAgentFlow));
       if (savedTokenExchanges) setCurrentTokenExchanges(JSON.parse(savedTokenExchanges));
       if (savedSessionId) setSessionId(savedSessionId);
+      if (savedActiveService === 'github' || savedActiveService === 'jira') {
+        setActiveService(savedActiveService);
+      }
     } catch (e) {
       console.error('Error loading chat history:', e);
     }
@@ -87,6 +123,11 @@ export default function Home() {
       sessionStorage.setItem(TOKEN_EXCHANGE_STORAGE_KEY, JSON.stringify(currentTokenExchanges));
     }
   }, [currentAgentFlow, currentTokenExchanges]);
+
+  // Save active service to sessionStorage so Architecture page can read it
+  useEffect(() => {
+    sessionStorage.setItem(ACTIVE_SERVICE_STORAGE_KEY, activeService);
+  }, [activeService]);
 
   // Redirect to login if not authenticated
   useEffect(() => {
@@ -766,8 +807,25 @@ export default function Home() {
           </div>
         </div>
 
+        {/* Resize Handle */}
+        <div
+          ref={resizeRef}
+          onMouseDown={() => setIsResizing(true)}
+          className={`w-1 cursor-col-resize hover:bg-yellow-400 transition-colors flex-shrink-0 ${
+            isResizing ? 'bg-yellow-400' : 'bg-transparent hover:bg-yellow-400/50'
+          }`}
+          style={{ marginLeft: '-2px', marginRight: '-2px', zIndex: 10 }}
+        />
+
         {/* Right Pane - Security Dashboard */}
-        <div className="w-96 border-l-4 overflow-y-auto p-4 space-y-4" style={{ background: 'linear-gradient(180deg, #3d2847 0%, #4a2c5a 50%, #5a3468 100%)', borderColor: '#fef08a' }}>
+        <div
+          className="border-l-4 overflow-y-auto p-4 space-y-4 flex-shrink-0"
+          style={{
+            width: `${rightPanelWidth}px`,
+            background: 'linear-gradient(180deg, #3d2847 0%, #4a2c5a 50%, #5a3468 100%)',
+            borderColor: '#fef08a'
+          }}
+        >
           {/* User Identity */}
           <UserIdentityCard
             name={session?.user?.name}
@@ -789,7 +847,7 @@ export default function Home() {
 
           {/* Architecture Link */}
           <Link
-            href="/architecture"
+            href={`/architecture?service=${activeService}`}
             className="block p-4 bg-gradient-to-r from-okta-blue to-okta-blue-light text-white rounded-xl hover:shadow-lg transition hover:scale-[1.02]"
           >
             <div className="flex items-center justify-between">

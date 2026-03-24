@@ -310,6 +310,7 @@ Examples:
                 "scopes": result.get("scopes", []),  # Real scopes from JWT
                 "requested_scopes": requested_scopes,  # What we asked for
                 "demo_mode": result.get("demo_mode", False),
+                "token_details": result.get("token_details"),  # All decoded tokens for UI
             })
 
             state["agent_flow"][-1]["status"] = "completed"
@@ -330,6 +331,7 @@ Examples:
                 "error": "User authorization required",
                 "interaction_uri": result.get("interaction_uri"),
                 "demo_mode": False,
+                "token_details": result.get("token_details"),  # Include ID token and client assertion
             })
 
             state["agent_flow"][-1]["status"] = "pending"

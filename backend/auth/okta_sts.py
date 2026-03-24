@@ -22,7 +22,7 @@ Token Exchange Parameters:
 """
 
 import logging
-from typing import Dict, Any, Optional, List
+from typing import Dict, Any, Optional, List, Tuple
 from datetime import datetime
 import httpx
 import base64
@@ -40,16 +40,83 @@ SUBJECT_TOKEN_TYPE_ID = "urn:ietf:params:oauth:token-type:id_token"
 CLIENT_ASSERTION_TYPE_JWT = "urn:ietf:params:oauth:client-assertion-type:jwt-bearer"
 
 
+def _decode_jwt_part(encoded: str) -> Dict[str, Any]:
+    """Decode a base64url encoded JWT part."""
+    try:
+        # Add padding if needed
+        padding = 4 - len(encoded) % 4
+        if padding != 4:
+            encoded += '=' * padding
+        decoded = base64.urlsafe_b64decode(encoded)
+        return json.loads(decoded)
+    except Exception as e:
+        logger.error(f"[JWT Decode] Failed to decode part: {e}")
+        return {}
+
+
+def _decode_jwt_full(token: str) -> Dict[str, Any]:
+    """
+    Decode JWT and extract header, payload, and signature info.
+    Returns full decoded token details for UI display.
+    Handles non-JWT tokens (opaque tokens like GitHub's gho_*) gracefully.
+    """
+    if not token:
+        return {"error": "No token provided"}
+
+    try:
+        parts = token.split('.')
+
+        # Check if it's a JWT (3 parts) or an opaque token
+        if len(parts) != 3:
+            # This is likely an opaque token (e.g., GitHub's gho_* tokens)
+            # Return info about the opaque token without logging a warning
+            token_type = "opaque"
+            if token.startswith("gho_"):
+                token_type = "GitHub App Token (opaque)"
+            elif token.startswith("ghp_"):
+                token_type = "GitHub Personal Access Token (opaque)"
+            elif token.startswith("ghu_"):
+                token_type = "GitHub User Access Token (opaque)"
+
+            return {
+                "header": {"type": "opaque"},
+                "payload": {
+                    "token_type": token_type,
+                    "note": "This is an opaque token, not a JWT. GitHub uses opaque tokens for API access."
+                },
+                "signature_preview": None,
+                "raw_token_preview": token[:20] + "..." if len(token) > 20 else token
+            }
+
+        header = _decode_jwt_part(parts[0])
+        payload = _decode_jwt_part(parts[1])
+
+        # Mask sensitive parts of signature for display
+        signature_preview = parts[2][:20] + "..." if len(parts[2]) > 20 else parts[2]
+
+        return {
+            "header": header,
+            "payload": payload,
+            "signature_preview": signature_preview,
+            "raw_token_preview": token[:50] + "..." if len(token) > 50 else token
+        }
+    except Exception as e:
+        logger.error(f"[JWT Decode] Failed to decode token: {e}")
+        return {"error": str(e)}
+
+
 def _decode_jwt_claims(token: str) -> Dict[str, Any]:
     """
     Decode JWT and extract claims without signature verification.
     Used to extract scope information from access tokens.
+    Returns empty dict for opaque tokens (not an error - expected for GitHub).
     """
     try:
         # Split the JWT into parts
         parts = token.split('.')
         if len(parts) != 3:
-            logger.warning("[JWT Decode] Invalid JWT format")
+            # Not a JWT - likely an opaque token (e.g., GitHub's gho_* tokens)
+            # This is expected, not an error
             return {}
 
         # Decode the payload (second part)
@@ -123,8 +190,13 @@ class OktaSTSExchange:
             self._jwt_builder
         )
 
-    def _build_token_exchange_payload(self, user_id_token: str) -> Dict[str, str]:
-        """Build the OAuth-STS token exchange request payload."""
+    def _build_token_exchange_payload(self, user_id_token: str) -> Tuple[Dict[str, str], Dict[str, Any]]:
+        """
+        Build the OAuth-STS token exchange request payload.
+
+        Returns:
+            tuple: (payload dict, token_details dict for UI)
+        """
         client_assertion = self._jwt_builder.build_client_assertion(
             principal_id=self._config.agent_id,
             audience=self._config.token_endpoint
@@ -145,7 +217,22 @@ class OktaSTSExchange:
             payload["scope"] = " ".join(self._scopes)
             logger.info(f"[OAuth-STS] Requesting scopes: {payload['scope']}")
 
-        return payload
+        # Decode tokens for UI display
+        id_token_details = _decode_jwt_full(user_id_token)
+        client_assertion_details = _decode_jwt_full(client_assertion)
+
+        token_details = {
+            "id_token": {
+                "decoded": id_token_details,
+                "token_preview": user_id_token[:60] + "..." if len(user_id_token) > 60 else user_id_token
+            },
+            "client_assertion": {
+                "decoded": client_assertion_details,
+                "token_preview": client_assertion[:60] + "..." if len(client_assertion) > 60 else client_assertion
+            }
+        }
+
+        return payload, token_details
 
     async def exchange_token(
         self,
@@ -172,11 +259,11 @@ class OktaSTSExchange:
             - exchange_details: dict (for UI visualization)
         """
         if not self.is_configured():
-            return self._demo_result()
+            return self._demo_result(user_id_token)
 
         try:
-            # Build token exchange payload
-            payload = self._build_token_exchange_payload(user_id_token)
+            # Build token exchange payload and get token details for UI
+            payload, token_details = self._build_token_exchange_payload(user_id_token)
 
             logger.info(f"[OAuth-STS] Exchanging token for resource: {self._resource_indicator}")
             logger.info(f"[OAuth-STS] Token endpoint: {self._config.token_endpoint}")
@@ -202,8 +289,21 @@ class OktaSTSExchange:
                 # Extract scopes from the JWT access token
                 scopes = _extract_scopes(access_token) if access_token else []
 
+                # Decode the access token for UI display
+                access_token_details = _decode_jwt_full(access_token) if access_token else {}
+
                 logger.info(f"[OAuth-STS] Token exchange SUCCESS, expires_in={token_data.get('expires_in')}")
                 logger.info(f"[OAuth-STS] Extracted scopes: {scopes}")
+
+                # Add access token to token_details
+                token_details["access_token"] = {
+                    "decoded": access_token_details,
+                    "token_preview": access_token[:60] + "..." if access_token and len(access_token) > 60 else access_token,
+                    "token_type": token_data.get("token_type", "Bearer"),
+                    "expires_in": token_data.get("expires_in"),
+                }
+
+                logger.info(f"[OAuth-STS] Returning token_details with {len(token_details)} keys: {list(token_details.keys())}")
 
                 return {
                     "success": True,
@@ -215,6 +315,7 @@ class OktaSTSExchange:
                     "interaction_required": False,
                     "interaction_uri": None,
                     "demo_mode": False,
+                    "token_details": token_details,  # All decoded tokens for UI
                     "exchange_details": {
                         "flow": "OAuth-STS (Brokered Consent)",
                         "agent": self._config.name,
@@ -259,6 +360,7 @@ class OktaSTSExchange:
                     "error_code": error_code,
                     "error_description": error_description,
                     "demo_mode": False,
+                    "token_details": token_details,  # Include ID token and client assertion even on interaction_required
                     "exchange_details": {
                         "flow": "OAuth-STS (Brokered Consent)",
                         "agent": self._config.name,
@@ -338,16 +440,69 @@ class OktaSTSExchange:
                 "demo_mode": False,
             }
 
-    def _demo_result(self) -> Dict[str, Any]:
+    def _demo_result(self, user_id_token: str = "") -> Dict[str, Any]:
         """Return demo mode result when OAuth-STS is not configured."""
+        now = int(datetime.now().timestamp())
+
+        # Create demo token details for UI
+        demo_token_details = {
+            "id_token": {
+                "decoded": {
+                    "header": {"alg": "RS256", "kid": "demo-key-id"},
+                    "payload": {
+                        "iss": "https://demo.okta.com",
+                        "sub": "demo-user-id",
+                        "aud": "demo-client-id",
+                        "iat": now,
+                        "exp": now + 3600,
+                        "email": "demo@example.com",
+                        "name": "Demo User"
+                    }
+                },
+                "token_preview": user_id_token[:60] + "..." if user_id_token and len(user_id_token) > 60 else (user_id_token or "demo-id-token...")
+            },
+            "client_assertion": {
+                "decoded": {
+                    "header": {"alg": "RS256", "kid": "demo-agent-key"},
+                    "payload": {
+                        "iss": "demo-agent-id",
+                        "sub": "demo-agent-id",
+                        "aud": "https://demo.okta.com/oauth2/v1/token",
+                        "iat": now,
+                        "exp": now + 60,
+                        "jti": "demo-jti-" + str(now)
+                    }
+                },
+                "token_preview": "eyJhbGciOiJSUzI1NiIsImtpZCI6ImRlbW8ta2V5In0..."
+            },
+            "access_token": {
+                "decoded": {
+                    "header": {"alg": "RS256", "typ": "JWT"},
+                    "payload": {
+                        "iss": "https://github.com",
+                        "sub": "demo-github-user",
+                        "aud": "demo-github-app",
+                        "iat": now,
+                        "exp": now + 3600,
+                        "scp": ["repo", "read:user", "read:org"]
+                    }
+                },
+                "token_preview": f"gho_demo_token_{now}...",
+                "token_type": "Bearer",
+                "expires_in": 3600
+            }
+        }
+
         return {
             "success": True,
-            "access_token": f"demo-github-token-{int(datetime.now().timestamp())}",
+            "access_token": f"demo-github-token-{now}",
             "token_type": "Bearer",
             "expires_in": 3600,
+            "scopes": ["repo", "read:user", "read:org"],
             "interaction_required": False,
             "interaction_uri": None,
             "demo_mode": True,
+            "token_details": demo_token_details,
             "exchange_details": {
                 "flow": "OAuth-STS (Demo Mode)",
                 "agent": "DevOps Agent",

@@ -72,6 +72,30 @@ class ChatRequest(BaseModel):
     history: Optional[List[ChatMessage]] = []
 
 
+class DecodedToken(BaseModel):
+    """Decoded JWT token details for UI display."""
+    header: Optional[Dict[str, Any]] = None
+    payload: Optional[Dict[str, Any]] = None
+    signature_preview: Optional[str] = None
+    raw_token_preview: Optional[str] = None
+    error: Optional[str] = None
+
+
+class TokenInfo(BaseModel):
+    """Full token information including decoded details."""
+    decoded: Optional[DecodedToken] = None
+    token_preview: Optional[str] = None
+    token_type: Optional[str] = None
+    expires_in: Optional[int] = None
+
+
+class TokenDetails(BaseModel):
+    """All token details for the OAuth-STS exchange."""
+    id_token: Optional[TokenInfo] = None
+    client_assertion: Optional[TokenInfo] = None
+    access_token: Optional[TokenInfo] = None
+
+
 class TokenExchange(BaseModel):
     """Token exchange result for UI visualization."""
     agent: str
@@ -85,6 +109,7 @@ class TokenExchange(BaseModel):
     error: Optional[str] = None
     interaction_uri: Optional[str] = None  # URL for user to authorize at ISV
     demo_mode: bool = False
+    token_details: Optional[TokenDetails] = None  # Decoded token information
 
 
 class AgentFlowStep(BaseModel):
@@ -243,6 +268,33 @@ async def chat(
         # Build token exchanges with proper model
         token_exchanges = []
         for ex in result.get("token_exchanges", []):
+            # Parse token_details if present
+            token_details_data = ex.get("token_details")
+            token_details = None
+            if token_details_data:
+                def parse_token_info(data: dict) -> Optional[TokenInfo]:
+                    if not data:
+                        return None
+                    decoded_data = data.get("decoded", {})
+                    return TokenInfo(
+                        decoded=DecodedToken(
+                            header=decoded_data.get("header"),
+                            payload=decoded_data.get("payload"),
+                            signature_preview=decoded_data.get("signature_preview"),
+                            raw_token_preview=decoded_data.get("raw_token_preview"),
+                            error=decoded_data.get("error"),
+                        ) if decoded_data else None,
+                        token_preview=data.get("token_preview"),
+                        token_type=data.get("token_type"),
+                        expires_in=data.get("expires_in"),
+                    )
+
+                token_details = TokenDetails(
+                    id_token=parse_token_info(token_details_data.get("id_token")),
+                    client_assertion=parse_token_info(token_details_data.get("client_assertion")),
+                    access_token=parse_token_info(token_details_data.get("access_token")),
+                )
+
             token_exchanges.append(TokenExchange(
                 agent=ex.get("agent", ""),
                 agent_name=ex.get("agent_name", ""),
@@ -255,6 +307,7 @@ async def chat(
                 error=ex.get("error"),
                 interaction_uri=ex.get("interaction_uri"),
                 demo_mode=ex.get("demo_mode", False),
+                token_details=token_details,
             ))
 
         return ChatResponse(

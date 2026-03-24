@@ -66,6 +66,44 @@ export interface AgentFlowStep {
   status: "processing" | "completed" | "pending" | "error";
 }
 
+// Decoded JWT Token Details
+export interface DecodedToken {
+  header?: {
+    alg?: string;
+    kid?: string;
+    typ?: string;
+  };
+  payload?: {
+    iss?: string;
+    sub?: string;
+    aud?: string;
+    iat?: number;
+    exp?: number;
+    jti?: string;
+    email?: string;
+    name?: string;
+    scp?: string[];
+    scope?: string;
+    [key: string]: unknown;
+  };
+  signature_preview?: string;
+  raw_token_preview?: string;
+  error?: string;
+}
+
+export interface TokenInfo {
+  decoded?: DecodedToken;
+  token_preview?: string;
+  token_type?: string;
+  expires_in?: number;
+}
+
+export interface TokenDetails {
+  id_token?: TokenInfo;
+  client_assertion?: TokenInfo;
+  access_token?: TokenInfo;
+}
+
 // Token Exchange Types
 export interface TokenExchange {
   agent: string;
@@ -79,6 +117,7 @@ export interface TokenExchange {
   error?: string;
   interaction_uri?: string;  // URL for user to authorize at ISV
   demo_mode: boolean;
+  token_details?: TokenDetails;  // Decoded token information
 }
 
 // API Response Types
