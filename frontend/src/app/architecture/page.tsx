@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, Suspense } from 'react';
 import Link from 'next/link';
 import { useSession } from 'next-auth/react';
 import { useSearchParams } from 'next/navigation';
@@ -70,7 +70,8 @@ function JWTDisplay({ title, header, payload, description, color }: JWTDisplayPr
   );
 }
 
-export default function ArchitecturePage() {
+// Inner component that uses useSearchParams (must be wrapped in Suspense)
+function ArchitectureContent() {
   const { data: session } = useSession();
   const searchParams = useSearchParams();
   const [activeService, setActiveService] = useState<'github' | 'jira'>('github');
@@ -803,5 +804,18 @@ export default function ArchitecturePage() {
         </div>
       </div>
     </main>
+  );
+}
+
+// Main export wrapped in Suspense
+export default function ArchitecturePage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-gradient-to-br from-slate-900 via-purple-900 to-slate-900 flex items-center justify-center">
+        <div className="text-white text-xl">Loading Architecture...</div>
+      </div>
+    }>
+      <ArchitectureContent />
+    </Suspense>
   );
 }

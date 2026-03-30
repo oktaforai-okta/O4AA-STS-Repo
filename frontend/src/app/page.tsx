@@ -46,6 +46,7 @@ export default function Home() {
   const [currentTokenExchanges, setCurrentTokenExchanges] = useState<TokenExchange[]>([]);
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [interactionUri, setInteractionUri] = useState<string | null>(null);
+  const [consentService, setConsentService] = useState<'github' | 'jira' | null>(null);
   const [pendingMessage, setPendingMessage] = useState<string | null>(null);
   const [activeService, setActiveService] = useState<'github' | 'jira'>('github');
   const [showSuggestions, setShowSuggestions] = useState(false);
@@ -180,7 +181,7 @@ export default function Home() {
 
     const authWindow = window.open(
       interactionUri,
-      activeService === 'jira' ? 'JiraAuthorization' : 'GitHubAuthorization',
+      consentService === 'jira' ? 'JiraAuthorization' : 'GitHubAuthorization',
       `width=${width},height=${height},left=${left},top=${top}`
     );
 
@@ -194,6 +195,7 @@ export default function Home() {
             handleSendMessage(pendingMessage);
             setPendingMessage(null);
             setInteractionUri(null);
+            setConsentService(null);
           }, 1000);
         }
       }
@@ -265,10 +267,14 @@ export default function Home() {
       setCurrentAgentFlow(data.agent_flow || []);
       setCurrentTokenExchanges(data.token_exchanges || []);
 
-      // Check if interaction_required (user needs to authorize at GitHub)
+      // Check if interaction_required (user needs to authorize)
       if (data.interaction_required && data.interaction_uri) {
         setInteractionUri(data.interaction_uri);
         setPendingMessage(userMessage);
+        // Determine which service triggered the consent from token_exchanges
+        const exchange = data.token_exchanges?.find((ex: TokenExchange) => ex.status === 'interaction_required');
+        const service = exchange?.agent_name?.toLowerCase().includes('jira') ? 'jira' : 'github';
+        setConsentService(service);
       }
 
       const assistantMessage: ChatMessage = {
@@ -338,18 +344,18 @@ export default function Home() {
   return (
     <main className="h-screen flex flex-col overflow-hidden" style={{ background: 'linear-gradient(180deg, #1a1a2e 0%, #2d1f3d 50%, #3d2847 100%)' }}>
       {/* Authorization Modal (when interaction_required) */}
-      {interactionUri && (
+      {interactionUri && consentService && (
         <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50">
           <div className={`bg-white rounded-2xl shadow-2xl p-8 max-w-md w-full border-4 ${
-            activeService === 'jira' ? 'border-blue-500' : 'border-gray-800'
+            consentService === 'jira' ? 'border-blue-500' : 'border-gray-800'
           }`}>
             <div className="text-center">
               <div className={`mx-auto w-16 h-16 rounded-full flex items-center justify-center mb-4 ${
-                activeService === 'jira'
+                consentService === 'jira'
                   ? 'bg-gradient-to-br from-blue-500 to-blue-700'
                   : 'bg-gradient-to-br from-gray-700 to-gray-900'
               }`}>
-                {activeService === 'jira' ? (
+                {consentService === 'jira' ? (
                   <svg className="w-10 h-10 text-white" fill="currentColor" viewBox="0 0 24 24">
                     <path d="M11.571 11.513H0a5.218 5.218 0 0 0 5.232 5.215h2.13v2.057A5.215 5.215 0 0 0 12.575 24V12.518a1.005 1.005 0 0 0-1.005-1.005zm5.723-5.756H5.736a5.215 5.215 0 0 0 5.215 5.214h2.129v2.058a5.218 5.218 0 0 0 5.215 5.214V6.758a1.001 1.001 0 0 0-1.001-1.001zM23.013 0H11.455a5.215 5.215 0 0 0 5.215 5.215h2.129v2.057A5.215 5.215 0 0 0 24 12.483V1.005A1.005 1.005 0 0 0 23.013 0z"/>
                   </svg>
@@ -360,15 +366,15 @@ export default function Home() {
                 )}
               </div>
               <h3 className="text-2xl font-bold text-gray-800 mb-2">
-                {activeService === 'jira' ? 'Atlassian Jira Authorization Required' : 'GitHub Authorization Required'}
+                {consentService === 'jira' ? 'Atlassian Jira Authorization Required' : 'GitHub Authorization Required'}
               </h3>
               <p className="text-gray-600 mb-6">
-                The DevOps Agent needs your permission to access your {activeService === 'jira' ? 'Atlassian Jira' : 'GitHub'} account via Okta Brokered Consent.
+                The DevOps Agent needs your permission to access your {consentService === 'jira' ? 'Atlassian Jira' : 'GitHub'} account via Okta Brokered Consent.
               </p>
               <button
                 onClick={handleAuthorize}
                 className={`w-full py-4 px-8 text-white rounded-xl font-bold text-lg transition-all shadow-xl hover:shadow-2xl flex items-center justify-center space-x-3 hover:scale-105 transform animate-pulse ${
-                  activeService === 'jira'
+                  consentService === 'jira'
                     ? 'bg-gradient-to-r from-blue-500 to-blue-700 hover:from-blue-600 hover:to-blue-800 border-b-4 border-blue-800'
                     : 'bg-gradient-to-r from-gray-700 to-gray-900 hover:from-gray-600 hover:to-gray-800 border-b-4 border-gray-950'
                 }`}
@@ -376,7 +382,7 @@ export default function Home() {
                 <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
                 </svg>
-                <span>🔓 Authorize {activeService === 'jira' ? 'Atlassian Jira' : 'GitHub'} Access</span>
+                <span>Authorize {consentService === 'jira' ? 'Atlassian Jira' : 'GitHub'} Access</span>
                 <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7l5 5m0 0l-5 5m5-5H6" />
                 </svg>
@@ -384,6 +390,7 @@ export default function Home() {
               <button
                 onClick={() => {
                   setInteractionUri(null);
+                  setConsentService(null);
                   setPendingMessage(null);
                 }}
                 className="mt-3 text-sm text-gray-500 hover:text-gray-700 transition"
@@ -392,7 +399,7 @@ export default function Home() {
               </button>
               <div className="mt-4 pt-4 border-t border-gray-200">
                 <p className="text-xs text-gray-500">
-                  This is a secure, one-time authorization through Okta. After authorizing, you can use all {activeService === 'jira' ? 'Jira' : 'GitHub'} features.
+                  This is a secure, one-time authorization through Okta. After authorizing, you can use all {consentService === 'jira' ? 'Jira' : 'GitHub'} features.
                 </p>
               </div>
             </div>
@@ -704,30 +711,36 @@ export default function Home() {
                     )}
 
                     {/* Show authorization button if interaction is required */}
-                    {msg.role === 'assistant' && msg.interactionRequired && msg.interactionUri && (
-                      <button
-                        onClick={() => {
-                          setInteractionUri(msg.interactionUri!);
-                          setPendingMessage(chatMessages.find(m => m.role === 'user' && m.timestamp < msg.timestamp)?.content || '');
-                        }}
-                        className={`mt-3 w-full py-2 px-4 text-white rounded-lg font-semibold transition shadow-md hover:shadow-lg flex items-center justify-center space-x-2 ${
-                          activeService === 'jira'
-                            ? 'bg-gradient-to-r from-blue-600 to-blue-800 hover:from-blue-500 hover:to-blue-700'
-                            : 'bg-gradient-to-r from-gray-700 to-gray-900 hover:from-gray-600 hover:to-gray-800'
-                        }`}
-                      >
-                        {activeService === 'jira' ? (
-                          <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
-                            <path d="M11.571 11.513H0a5.218 5.218 0 0 0 5.232 5.215h2.13v2.057A5.215 5.215 0 0 0 12.575 24V12.518a1.005 1.005 0 0 0-1.005-1.005zm5.723-5.756H5.736a5.215 5.215 0 0 0 5.215 5.214h2.129v2.058a5.218 5.218 0 0 0 5.215 5.214V6.758a1.001 1.001 0 0 0-1.001-1.001zM23.013 0H11.455a5.215 5.215 0 0 0 5.215 5.215h2.129v2.057A5.215 5.215 0 0 0 24 12.483V1.005A1.005 1.005 0 0 0 23.013 0z"/>
-                          </svg>
-                        ) : (
-                          <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
-                            <path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/>
-                          </svg>
-                        )}
-                        <span>Authorize {activeService === 'jira' ? 'Atlassian Jira' : 'GitHub'} Access</span>
-                      </button>
-                    )}
+                    {msg.role === 'assistant' && msg.interactionRequired && msg.interactionUri && (() => {
+                      // Derive service from message's token exchanges
+                      const exchange = msg.tokenExchanges?.find(ex => ex.status === 'interaction_required');
+                      const msgService = exchange?.agent_name?.toLowerCase().includes('jira') ? 'jira' : 'github';
+                      return (
+                        <button
+                          onClick={() => {
+                            setInteractionUri(msg.interactionUri!);
+                            setConsentService(msgService);
+                            setPendingMessage(chatMessages.find(m => m.role === 'user' && m.timestamp < msg.timestamp)?.content || '');
+                          }}
+                          className={`mt-3 w-full py-2 px-4 text-white rounded-lg font-semibold transition shadow-md hover:shadow-lg flex items-center justify-center space-x-2 ${
+                            msgService === 'jira'
+                              ? 'bg-gradient-to-r from-blue-600 to-blue-800 hover:from-blue-500 hover:to-blue-700'
+                              : 'bg-gradient-to-r from-gray-700 to-gray-900 hover:from-gray-600 hover:to-gray-800'
+                          }`}
+                        >
+                          {msgService === 'jira' ? (
+                            <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
+                              <path d="M11.571 11.513H0a5.218 5.218 0 0 0 5.232 5.215h2.13v2.057A5.215 5.215 0 0 0 12.575 24V12.518a1.005 1.005 0 0 0-1.005-1.005zm5.723-5.756H5.736a5.215 5.215 0 0 0 5.215 5.214h2.129v2.058a5.218 5.218 0 0 0 5.215 5.214V6.758a1.001 1.001 0 0 0-1.001-1.001zM23.013 0H11.455a5.215 5.215 0 0 0 5.215 5.215h2.129v2.057A5.215 5.215 0 0 0 24 12.483V1.005A1.005 1.005 0 0 0 23.013 0z"/>
+                            </svg>
+                          ) : (
+                            <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 24 24">
+                              <path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/>
+                            </svg>
+                          )}
+                          <span>Authorize {msgService === 'jira' ? 'Atlassian Jira' : 'GitHub'} Access</span>
+                        </button>
+                      );
+                    })()}
 
                     <div className={`text-xs mt-2 ${msg.role === 'user' ? 'text-white/70' : 'text-gray-400'}`}>
                       {new Date(msg.timestamp).toLocaleTimeString()}

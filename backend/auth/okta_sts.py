@@ -303,8 +303,6 @@ class OktaSTSExchange:
                     "expires_in": token_data.get("expires_in"),
                 }
 
-                logger.info(f"[OAuth-STS] Returning token_details with {len(token_details)} keys: {list(token_details.keys())}")
-
                 return {
                     "success": True,
                     "access_token": access_token,

@@ -143,10 +143,6 @@ export default function TokenFlowAnalysis({ exchanges, isLoading, activeService 
   const latestExchange = exchanges.length > 0 ? exchanges[exchanges.length - 1] : null;
   const tokenDetails = latestExchange?.token_details;
 
-  // Debug logging
-  console.log('[TokenFlowAnalysis] Latest exchange:', latestExchange);
-  console.log('[TokenFlowAnalysis] Token details:', tokenDetails);
-
   // Determine service name from latest exchange or prop
   const serviceName = latestExchange?.agent_name.toLowerCase().includes('jira') ? 'Jira' :
                      latestExchange?.agent_name.toLowerCase().includes('github') ? 'GitHub' :
