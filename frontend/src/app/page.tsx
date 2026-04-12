@@ -424,8 +424,25 @@ export default function Home() {
         </div>
 
         <div className="px-6 py-4 flex justify-between items-center relative z-10">
-          {/* Left: Logo */}
+          {/* Left: Home Button + Logo */}
           <div className="flex items-center space-x-4">
+            {/* Home Button */}
+            <button
+              onClick={() => {
+                setChatMessages([]);
+                setCurrentAgentFlow([]);
+                setCurrentTokenExchanges([]);
+                sessionStorage.removeItem(CHAT_STORAGE_KEY);
+                sessionStorage.removeItem(AGENT_FLOW_STORAGE_KEY);
+                sessionStorage.removeItem(TOKEN_EXCHANGE_STORAGE_KEY);
+              }}
+              className="w-10 h-10 bg-white/10 hover:bg-accent/30 rounded-lg flex items-center justify-center transition border border-white/20 hover:border-accent/50 group"
+              title="Home"
+            >
+              <svg className="w-5 h-5 text-white group-hover:text-yellow-300 transition" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
+              </svg>
+            </button>
             <div className="relative">
               {/* DevOps Agent Robot Icon */}
               <div className="w-12 h-12 bg-gradient-to-br from-accent to-devops-purple rounded-xl flex items-center justify-center shadow-lg">
