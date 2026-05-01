@@ -92,12 +92,14 @@ class Orchestrator:
             logger.error("ANTHROPIC_API_KEY not set in environment!")
             raise ValueError("ANTHROPIC_API_KEY environment variable is required")
 
+        llm_model = os.getenv("LLM_MODEL_NAME", "claude-sonnet-4-6")
         self.llm = ChatAnthropic(
-            model="claude-sonnet-4-6",
+            model=llm_model,
             temperature=0,
             anthropic_api_key=anthropic_api_key,
             anthropic_api_url="https://api.anthropic.com"
         )
+        logger.info(f"[LLM Config] ChatAnthropic initialized with model: {llm_model}")
 
         # Build the workflow graph
         self.graph = self._build_graph()
@@ -188,12 +190,22 @@ Examples:
 - "What can you do?" → {"service": "github", "intent": "help", "parameters": {}}
 """
 
-        response = await self.llm.ainvoke([
-            SystemMessage(content=system_prompt),
-            HumanMessage(content=state["user_message"])
-        ])
-
         try:
+            response = await self.llm.ainvoke([
+                SystemMessage(content=system_prompt),
+                HumanMessage(content=state["user_message"])
+            ])
+
+            # Handle None or empty response
+            if response is None or response.content is None:
+                logger.error("[Router] LLM returned None response")
+                state["service"] = "github"
+                state["intent"] = "help"
+                state["parameters"] = {}
+                state["agent_flow"][-1]["status"] = "error"
+                state["agent_flow"][-1]["action"] = "LLM response error"
+                return state
+
             content = response.content.strip()
             if content.startswith("```"):
                 lines = content.split("\n")
@@ -206,8 +218,13 @@ Examples:
             state["parameters"] = result.get("parameters", {})
             logger.info(f"[Router] Service: {state['service']}, Intent: {state['intent']}")
         except json.JSONDecodeError as e:
-            logger.warning(f"Failed to parse router response: {response.content}")
+            logger.warning(f"Failed to parse router response: {response.content if response else 'None'}")
             logger.error(f"JSON parse error: {e}")
+            state["service"] = "github"
+            state["intent"] = "help"
+            state["parameters"] = {}
+        except Exception as e:
+            logger.error(f"[Router] LLM invocation error: {e}")
             state["service"] = "github"
             state["intent"] = "help"
             state["parameters"] = {}
@@ -662,12 +679,22 @@ Result: {json.dumps(operation_result.get('data', {}), indent=2)}
 Summary: {operation_result.get('summary', '')}
 """
 
-        response = await self.llm.ainvoke([
-            SystemMessage(content=system_prompt),
-            HumanMessage(content=f"Generate a response for this {service_name} operation:\n{context}")
-        ])
+        try:
+            response = await self.llm.ainvoke([
+                SystemMessage(content=system_prompt),
+                HumanMessage(content=f"Generate a response for this {service_name} operation:\n{context}")
+            ])
 
-        state["final_response"] = response.content
+            # Handle None or empty response
+            if response is None or response.content is None:
+                logger.error("[Response] LLM returned None response")
+                state["final_response"] = f"Operation completed. Result: {operation_result.get('summary', 'Success')}"
+            else:
+                state["final_response"] = response.content
+        except Exception as e:
+            logger.error(f"[Response] LLM invocation error: {e}")
+            state["final_response"] = f"Operation completed. Result: {operation_result.get('summary', 'Success')}"
+
         state["agent_flow"][-1]["status"] = "completed"
 
         return state

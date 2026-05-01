@@ -3,13 +3,12 @@
 import { useState, useRef, useEffect } from 'react';
 import { useSession, signOut } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
-import Link from 'next/link';
 import ReactMarkdown from 'react-markdown';
 import AgentFlowCard from '@/components/AgentFlowCard';
 import TokenExchangeCard from '@/components/TokenExchangeCard';
 import UserIdentityCard from '@/components/UserIdentityCard';
 import QuickActionsCard from '@/components/QuickActionsCard';
-import TokenFlowAnalysis from '@/components/TokenFlowAnalysis';
+import WorkflowSteps from '@/components/WorkflowSteps';
 import { ChatMessage, AgentFlowStep, TokenExchange } from '@/types';
 
 const githubExampleQuestions = [
@@ -50,18 +49,23 @@ export default function Home() {
   const [pendingMessage, setPendingMessage] = useState<string | null>(null);
   const [activeService, setActiveService] = useState<'github' | 'jira'>('github');
   const [showSuggestions, setShowSuggestions] = useState(false);
-  const [rightPanelWidth, setRightPanelWidth] = useState(480); // Increased default width
+  const [rightPanelWidth, setRightPanelWidth] = useState(960); // Detail pane defaults to ~60% of a typical 1600px viewport
   const [isResizing, setIsResizing] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const resizeRef = useRef<HTMLDivElement>(null);
+
+  // Initialize detail pane to 60% of viewport on mount; keep chat at ~40%
+  useEffect(() => {
+    setRightPanelWidth(Math.round(window.innerWidth * 0.6));
+  }, []);
 
   // Handle panel resize
   useEffect(() => {
     const handleMouseMove = (e: MouseEvent) => {
       if (!isResizing) return;
       const newWidth = window.innerWidth - e.clientX;
-      // Constrain between 350px and 700px
-      setRightPanelWidth(Math.min(700, Math.max(350, newWidth)));
+      // Chat floor 400px; detail ceiling 75% of viewport
+      setRightPanelWidth(Math.min(window.innerWidth * 0.75, Math.max(400, newWidth)));
     };
 
     const handleMouseUp = () => {
@@ -432,17 +436,21 @@ export default function Home() {
                 setChatMessages([]);
                 setCurrentAgentFlow([]);
                 setCurrentTokenExchanges([]);
+                setInteractionUri(null);
+                setConsentService(null);
+                setPendingMessage(null);
                 sessionStorage.removeItem(CHAT_STORAGE_KEY);
                 sessionStorage.removeItem(AGENT_FLOW_STORAGE_KEY);
                 sessionStorage.removeItem(TOKEN_EXCHANGE_STORAGE_KEY);
               }}
-              className="w-10 h-10 bg-white/10 hover:bg-accent/30 rounded-lg flex items-center justify-center transition border border-white/20 hover:border-accent/50 group"
-              title="Home"
+              className="p-2.5 bg-white/10 hover:bg-accent/30 text-white rounded-lg transition border border-white/20 hover:border-accent/50 flex items-center justify-center"
+              title="Return to Home"
             >
-              <svg className="w-5 h-5 text-white group-hover:text-yellow-300 transition" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
               </svg>
             </button>
+
             <div className="relative">
               {/* DevOps Agent Robot Icon */}
               <div className="w-12 h-12 bg-gradient-to-br from-accent to-devops-purple rounded-xl flex items-center justify-center shadow-lg">
@@ -869,27 +877,11 @@ export default function Home() {
           {/* Token Exchanges */}
           <TokenExchangeCard exchanges={currentTokenExchanges} />
 
-          {/* Token Flow Analysis - Learn More Section */}
-          <TokenFlowAnalysis exchanges={currentTokenExchanges} isLoading={isLoading} activeService={activeService} />
+          {/* Step-by-Step Workflow */}
+          <WorkflowSteps exchanges={currentTokenExchanges} isLoading={isLoading} activeService={activeService} />
 
           {/* Quick Actions */}
           <QuickActionsCard onAction={(msg) => handleSendMessage(msg)} onTestConsent={handleTestConsent} activeService={activeService} />
-
-          {/* Architecture Link */}
-          <Link
-            href={`/architecture?service=${activeService}`}
-            className="block p-4 bg-gradient-to-r from-okta-blue to-okta-blue-light text-white rounded-xl hover:shadow-lg transition hover:scale-[1.02]"
-          >
-            <div className="flex items-center justify-between">
-              <div>
-                <div className="font-semibold">Learn More</div>
-                <div className="text-sm text-white/80">View Architecture Details</div>
-              </div>
-              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-              </svg>
-            </div>
-          </Link>
         </div>
       </div>
     </main>

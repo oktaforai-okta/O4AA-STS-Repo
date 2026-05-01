@@ -78,6 +78,7 @@ class DecodedToken(BaseModel):
     payload: Optional[Dict[str, Any]] = None
     signature_preview: Optional[str] = None
     raw_token_preview: Optional[str] = None
+    raw_token: Optional[str] = None
     error: Optional[str] = None
 
 
@@ -282,6 +283,7 @@ async def chat(
                             payload=decoded_data.get("payload"),
                             signature_preview=decoded_data.get("signature_preview"),
                             raw_token_preview=decoded_data.get("raw_token_preview"),
+                            raw_token=decoded_data.get("raw_token"),
                             error=decoded_data.get("error"),
                         ) if decoded_data else None,
                         token_preview=data.get("token_preview"),

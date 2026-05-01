@@ -85,7 +85,8 @@ def _decode_jwt_full(token: str) -> Dict[str, Any]:
                     "note": "This is an opaque token, not a JWT. GitHub uses opaque tokens for API access."
                 },
                 "signature_preview": None,
-                "raw_token_preview": token[:20] + "..." if len(token) > 20 else token
+                "raw_token_preview": token[:20] + "..." if len(token) > 20 else token,
+                "raw_token": token,
             }
 
         header = _decode_jwt_part(parts[0])
@@ -98,7 +99,8 @@ def _decode_jwt_full(token: str) -> Dict[str, Any]:
             "header": header,
             "payload": payload,
             "signature_preview": signature_preview,
-            "raw_token_preview": token[:50] + "..." if len(token) > 50 else token
+            "raw_token_preview": token[:50] + "..." if len(token) > 50 else token,
+            "raw_token": token,
         }
     except Exception as e:
         logger.error(f"[JWT Decode] Failed to decode token: {e}")

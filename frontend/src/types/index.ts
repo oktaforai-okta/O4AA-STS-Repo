@@ -88,6 +88,7 @@ export interface DecodedToken {
   };
   signature_preview?: string;
   raw_token_preview?: string;
+  raw_token?: string;
   error?: string;
 }
 
