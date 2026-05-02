@@ -275,7 +275,7 @@ export default function WorkflowSteps({ exchanges, isLoading, activeService = 'g
         <div className="px-4 pb-4 space-y-2 animate-fadeIn">
           <Step
             stepNumber={1}
-            title="User authenticated to Okta for Chat Bot interface"
+            title="User authenticated to Okta for AI Agent Interface"
             description="Sign-in complete; ID Token issued"
             icon={<User className="w-3 h-3 text-white" />}
             status={statusOf(hasIdToken, isLoading === true && !hasIdToken)}
