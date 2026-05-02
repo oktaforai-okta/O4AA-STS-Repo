@@ -124,9 +124,9 @@ function StepTokenView({ tokenInfo, label }: { tokenInfo?: TokenInfo; label: str
               <div className="text-[9px] font-semibold text-cyan-300 uppercase mb-0.5">Header</div>
               <div className="font-mono text-[10px] space-y-0.5">
                 {Object.entries(decoded.header).map(([k, v]) => (
-                  <div key={k} className="flex">
-                    <span className="text-red-300 w-12 flex-shrink-0">{k}:</span>
-                    <span className="text-white/90 truncate">{formatValue(v)}</span>
+                  <div key={k} className="flex flex-wrap gap-x-2">
+                    <span className="text-red-300 break-all">{k}:</span>
+                    <span className="text-white/90 break-all min-w-0">{formatValue(v)}</span>
                   </div>
                 ))}
               </div>
@@ -137,9 +137,9 @@ function StepTokenView({ tokenInfo, label }: { tokenInfo?: TokenInfo; label: str
               <div className="text-[9px] font-semibold text-cyan-300 uppercase mb-0.5">Payload</div>
               <div className="font-mono text-[10px] space-y-0.5">
                 {Object.entries(decoded.payload).map(([k, v]) => (
-                  <div key={k} className="flex">
-                    <span className="text-purple-300 w-12 flex-shrink-0">{k}:</span>
-                    <span className="text-white/90 truncate">
+                  <div key={k} className="flex flex-wrap gap-x-2">
+                    <span className="text-purple-300 break-all">{k}:</span>
+                    <span className="text-white/90 break-all min-w-0">
                       {k === 'iat' || k === 'exp' ? formatTimestamp(v as number) : formatValue(v)}
                     </span>
                   </div>
