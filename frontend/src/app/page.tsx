@@ -5,7 +5,6 @@ import { useSession, signOut } from 'next-auth/react';
 import { useRouter } from 'next/navigation';
 import ReactMarkdown from 'react-markdown';
 import AgentFlowCard from '@/components/AgentFlowCard';
-import TokenExchangeCard from '@/components/TokenExchangeCard';
 import UserIdentityCard from '@/components/UserIdentityCard';
 import QuickActionsCard from '@/components/QuickActionsCard';
 import WorkflowSteps from '@/components/WorkflowSteps';
@@ -873,9 +872,6 @@ export default function Home() {
 
           {/* Agent Flow */}
           <AgentFlowCard steps={currentAgentFlow} isLoading={isLoading} />
-
-          {/* Token Exchanges */}
-          <TokenExchangeCard exchanges={currentTokenExchanges} />
 
           {/* Step-by-Step Workflow */}
           <WorkflowSteps exchanges={currentTokenExchanges} isLoading={isLoading} activeService={activeService} />

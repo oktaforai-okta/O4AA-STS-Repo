@@ -56,13 +56,13 @@ export default function AgentFlowCard({ steps, isLoading }: Props) {
   return (
     <div className="rounded-xl border-2 shadow-sm overflow-hidden" style={{ backgroundColor: '#e0f2f1', borderColor: '#26a69a' }}>
       <div className="bg-gradient-to-r from-primary to-primary-light px-4 py-3 border-b border-neutral-border">
-        <h3 className="text-white font-semibold flex items-center gap-2">
+        <h3 className="text-black font-semibold flex items-center gap-2">
           <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
               d="M13 10V3L4 14h7v7l9-11h-7z" />
           </svg>
           <span>Agent Flow</span>
-          <span className="text-white/60 text-sm font-normal">— LangGraph + Claude</span>
+          <span className="text-black/60 text-sm font-normal">— LangGraph + Claude</span>
         </h3>
       </div>
 
@@ -122,35 +122,6 @@ export default function AgentFlowCard({ steps, isLoading }: Props) {
             );
           })}
         </div>
-
-        {/* Step Details */}
-        {steps.length > 0 && (
-          <div className="mt-4 pt-3 border-t border-gray-100">
-            <div className="space-y-1">
-              {steps.map((step, idx) => (
-                <div
-                  key={idx}
-                  className={`flex items-center justify-between text-xs px-2 py-1 rounded ${
-                    step.status === 'completed' ? 'bg-success-green/5' :
-                    step.status === 'error' ? 'bg-error-red/5' :
-                    step.status === 'processing' ? 'bg-accent/5' :
-                    'bg-gray-50'
-                  }`}
-                >
-                  <span className="text-gray-600 font-mono">{step.step}</span>
-                  <span className={`${
-                    step.status === 'completed' ? 'text-success-green' :
-                    step.status === 'error' ? 'text-error-red' :
-                    step.status === 'processing' ? 'text-accent' :
-                    'text-gray-400'
-                  }`}>
-                    {step.action}
-                  </span>
-                </div>
-              ))}
-            </div>
-          </div>
-        )}
 
         {/* Loading indicator */}
         {isLoading && (
